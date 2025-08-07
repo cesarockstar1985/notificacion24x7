@@ -3,22 +3,33 @@ const { google } = require('googleapis');
 const TelegramBot = require('node-telegram-bot-api');
 const cron = require('node-cron');
 
+require('dotenv').config();
+
+const { CREDENTIALS_PATH, SPREADSHEET_ID, TELEGRAM_TOKEN, CHAT_ID } = process.env
+
 // --- CONFIGURACIÓN ---
 // Google Sheets
-const CREDENTIALS_PATH = './southern-guild-468213-u3-5195747113a5.json';
-const SPREADSHEET_ID = '1RKXHlQVJJqWr8zNG3rFHQdAGSRx6vOr4B5IFvPYzSQE'; // Tu ID de Sheet
 const RANGO = 'Calendario!H6:J17'; // ¡Ajusta el nombre de la hoja y el rango!
 const MY_NAME = 'César Peralta';
-// const MY_NAME = 'Javier Villalba';
-
-// Telegram
-const TELEGRAM_TOKEN = '8362932181:AAGsx2VhUSOLaDzvxz_K2AQKlW__sQKWIMI';
-const CHAT_ID = '1076817858'; // El ID que obtuviste de @userinfobot
-// --- FIN DE LA CONFIGURACIÓN ---
-
 
 // Inicializa el bot de Telegram
-const bot = new TelegramBot(TELEGRAM_TOKEN);
+const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
+
+bot.onText(/\/start/, (msg) => {
+  const chatId = msg.chat.id;
+  const nombreUsuario = msg.from.first_name;
+
+  const mensajeBienvenida = `¡Hola, ${nombreUsuario}! 👋\n\nSoy tu bot notificador. Estoy activo y funcionando.\n\nRevisaré tu Google Sheet todos los días a las 7:00 AM y te avisaré si encuentro datos nuevos.`;
+
+  bot.sendMessage(chatId, mensajeBienvenida);
+  console.log(`El usuario ${nombreUsuario} (ID: ${chatId}) ha iniciado el bot.`);
+
+  leerSheetYNotificar()
+});
+
+async function formatText(mainText, weekText) {
+  return `ESTÁS DE SOPORTE ${mainText} ${weekText} `;
+}
 
 async function leerSheetYNotificar() {
   console.log('Iniciando proceso...');
@@ -56,11 +67,11 @@ async function leerSheetYNotificar() {
       let mensaje = '🔔 **Soporte 24x7** 🔔\n\n';
 
         if(soportePrincipalSemana == MY_NAME){
-            mensaje += 'ESTÁS DE SOPORTE PRINCIPAL ESTA SEMANA ';
+            mensaje += formatText('PRINCIPAL', 'ESTA SEMANA');
         }
 
         if(soporteBackupSemana == MY_NAME){
-            mensaje += 'ESTÁS DE SOPORTE BACKUP ESTA SEMANA ';
+            mensaje += formatText('BACKUP', 'ESTA SEMANA');
         }
 
         if((soportePrincipalSemana == MY_NAME && soportePrincipalWeekEnd == MY_NAME) || (soporteBackupSemana == MY_NAME && soporteBackupWeekEnd == MY_NAME)){
@@ -80,11 +91,11 @@ async function leerSheetYNotificar() {
         mensaje += `Backup: ${soporteBackupWeekEnd}\n\n`
 
         if(soportePrincipalSemanaNextWeek == MY_NAME){
-            mensaje += 'ESTÁS DE SOPORTE PRINCIPAL LA SIGUIENTE SEMANA ';
+            mensaje += formatText('PRINCIPAL', 'LA SIGUIENTE SEMANA');
         }
 
         if(soporteBackupSemanaNextWeek == MY_NAME){
-            mensaje += 'ESTÁS DE SOPORTE BACKUP LA SIGUIENTE SEMANA ';
+            mensaje += formatText('BACKUP', 'LA SIGUIENTE SEMANA');
         }
 
         if((soportePrincipalSemanaNextWeek == MY_NAME && soportePrincipalWeekEndNextWeek == MY_NAME) || (soporteBackupSemanaNextWeek == MY_NAME && soporteBackupWeekEndNextWeek == MY_NAME)){
