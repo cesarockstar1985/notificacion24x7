@@ -1,2 +1,6 @@
 node_modules
 .env
+
+# Credenciales Google Cloud - NUNCA subir
+southern-guild-468213-u3-5195747113a5.json
+*.json.key
