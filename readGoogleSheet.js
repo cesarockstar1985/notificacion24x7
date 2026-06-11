@@ -5,7 +5,13 @@ const cron = require('node-cron');
 
 require('dotenv').config();
 
-const { CREDENTIALS_PATH, SPREADSHEET_ID, TELEGRAM_TOKEN, CHAT_ID } = process.env
+const { CREDENTIALS_PATH, GOOGLE_CREDENTIALS, SPREADSHEET_ID, TELEGRAM_TOKEN, CHAT_ID } = process.env
+
+// En Railway usamos la variable de entorno GOOGLE_CREDENTIALS (contenido del JSON).
+// En local seguimos usando el archivo apuntado por CREDENTIALS_PATH.
+const googleAuthOptions = GOOGLE_CREDENTIALS
+  ? { credentials: JSON.parse(GOOGLE_CREDENTIALS) }
+  : { keyFile: CREDENTIALS_PATH };
 
 // --- CONFIGURACIÓN ---
 // Google Sheets
@@ -36,7 +42,7 @@ async function leerSheetYNotificar() {
   try {
     // 1. AUTENTICACIÓN Y LECTURA DE GOOGLE SHEETS
     const auth = new google.auth.GoogleAuth({
-      keyFile: CREDENTIALS_PATH,
+      ...googleAuthOptions,
       scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
     });
     const sheets = google.sheets({ version: 'v4', auth });
