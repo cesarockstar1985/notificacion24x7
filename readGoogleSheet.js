@@ -5,7 +5,7 @@ const cron = require('node-cron');
 
 require('dotenv').config();
 
-const { CREDENTIALS_PATH, GOOGLE_CREDENTIALS, SPREADSHEET_ID, TELEGRAM_TOKEN, CHAT_ID } = process.env
+const { CREDENTIALS_PATH, GOOGLE_CREDENTIALS, SPREADSHEET_ID, TELEGRAM_TOKEN } = process.env
 
 // En Railway usamos la variable de entorno GOOGLE_CREDENTIALS (contenido del JSON).
 // En local seguimos usando el archivo apuntado por CREDENTIALS_PATH.
@@ -18,6 +18,9 @@ const googleAuthOptions = GOOGLE_CREDENTIALS
 const RANGO = 'Calendario!H6:J17'; // ¡Ajusta el nombre de la hoja y el rango!
 const MY_NAME = 'César Peralta';
 
+// Último chat que interactuó con el bot; lo usa el cron diario como destino.
+let ultimoChatId = null;
+
 // Inicializa el bot de Telegram
 const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
 
@@ -29,6 +32,7 @@ bot.setMyCommands([
 
 bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
+  ultimoChatId = chatId;
   const nombreUsuario = msg.from.first_name;
 
   const mensajeBienvenida = `¡Hola, ${nombreUsuario}! 👋\n\nSoy tu bot notificador. Estoy activo y funcionando.\n\nRevisaré tu Google Sheet todos los días a las 7:00 AM y te avisaré si encuentro datos nuevos.`;
@@ -40,17 +44,22 @@ bot.onText(/\/start/, (msg) => {
 // Comando para forzar una revisión manual del Sheet
 bot.onText(/\/check/, (msg) => {
   const chatId = msg.chat.id;
+  ultimoChatId = chatId;
   console.log(`Revisión manual solicitada por chat ${chatId}.`);
   bot.sendMessage(chatId, '🔎 Revisando el Google Sheet...');
-  leerSheetYNotificar();
+  leerSheetYNotificar(chatId);
 });
 
 async function formatText(mainText, weekText) {
   return `ESTÁS DE SOPORTE ${mainText} ${weekText} `;
 }
 
-async function leerSheetYNotificar() {
+async function leerSheetYNotificar(destinoChatId) {
   console.log('Iniciando proceso...');
+  if (!destinoChatId) {
+    console.log('No hay un chat destino; nadie ha iniciado el bot todavía. Omitiendo notificación.');
+    return;
+  }
   try {
     // 1. AUTENTICACIÓN Y LECTURA DE GOOGLE SHEETS
     const auth = new google.auth.GoogleAuth({
@@ -126,7 +135,7 @@ async function leerSheetYNotificar() {
 
       console.log('Enviando notificación a Telegram...');
       // Envía el mensaje usando el bot
-      await bot.sendMessage(CHAT_ID, mensaje, { parse_mode: 'Markdown' });
+      await bot.sendMessage(destinoChatId, mensaje, { parse_mode: 'Markdown' });
       
       console.log('¡Notificación enviada con éxito! ✅');
     } else {
@@ -138,7 +147,7 @@ async function leerSheetYNotificar() {
     console.error('Hubo un error en el proceso:', error.message);
     // Opcional: Notificar el error por Telegram
     try {
-      await bot.sendMessage(CHAT_ID, `❌ Hubo un error en el bot: ${error.message}`);
+      await bot.sendMessage(destinoChatId, `❌ Hubo un error en el bot: ${error.message}`);
     } catch (telegramError) {
       console.error('Error al enviar la notificación de error:', telegramError.message);
     }
@@ -147,7 +156,7 @@ async function leerSheetYNotificar() {
 
 // 2. PROGRAMA LA TAREA PARA QUE SE EJECUTE TODOS LOS DÍAS A LAS 9:00 AM
 cron.schedule('0 7 * * *', () => {
-  leerSheetYNotificar();
+  leerSheetYNotificar(ultimoChatId);
 }, {
   scheduled: true,
   timezone: "America/Asuncion" // <-- Es buena práctica definir la zona horaria
