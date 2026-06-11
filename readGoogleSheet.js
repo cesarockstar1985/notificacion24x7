@@ -28,6 +28,8 @@ const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
 bot.setMyCommands([
   { command: 'start', description: 'Iniciar el bot y ver el mensaje de bienvenida' },
   { command: 'check', description: 'Revisar el Google Sheet ahora' },
+  { command: 'status', description: 'Ver el estado del bot' },
+  { command: 'help', description: 'Ver la lista de comandos' },
 ]);
 
 bot.onText(/\/start/, (msg) => {
@@ -48,6 +50,28 @@ bot.onText(/\/check/, (msg) => {
   console.log(`Revisión manual solicitada por chat ${chatId}.`);
   bot.sendMessage(chatId, '🔎 Revisando el Google Sheet...');
   leerSheetYNotificar(chatId, true);
+});
+
+// Comando para ver la lista de comandos disponibles
+bot.onText(/\/help/, (msg) => {
+  const ayuda = '🤖 *Comandos disponibles*\n\n' +
+    '/start - Iniciar el bot y ver la bienvenida\n' +
+    '/check - Revisar el Google Sheet ahora\n' +
+    '/status - Ver el estado del bot\n' +
+    '/help - Ver esta lista de comandos';
+  bot.sendMessage(msg.chat.id, ayuda, { parse_mode: 'Markdown' });
+});
+
+// Comando para ver el estado del bot
+bot.onText(/\/status/, (msg) => {
+  const destino = ultimoChatId
+    ? `\`${ultimoChatId}\``
+    : 'ninguno todavía (escribí /check o /start)';
+  const estado = '✅ *Bot activo*\n\n' +
+    `👤 Monitoreando a: *${MY_NAME}*\n` +
+    '⏰ Aviso automático: todos los días a las 7:00 AM (America/Asuncion)\n' +
+    `📨 Chat de avisos: ${destino}`;
+  bot.sendMessage(msg.chat.id, estado, { parse_mode: 'Markdown' });
 });
 
 function formatText(mainText, weekText) {
