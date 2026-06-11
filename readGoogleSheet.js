@@ -74,8 +74,18 @@ bot.onText(/\/status/, (msg) => {
   bot.sendMessage(msg.chat.id, estado, { parse_mode: 'Markdown' });
 });
 
-function formatText(mainText, weekText) {
-  return `⚠️ Estás de soporte ${mainText} ${weekText}`;
+// Arma una sola alerta por periodo combinando el turno entre semana y el de fin de semana.
+// Devuelve null si en ese periodo no te toca soporte.
+function construirAlerta(periodo, principalSemana, backupSemana, principalFinde, backupFinde) {
+  const rolSemana = principalSemana == MY_NAME ? 'PRINCIPAL' : (backupSemana == MY_NAME ? 'BACKUP' : null);
+  const rolFinde = principalFinde == MY_NAME ? 'PRINCIPAL' : (backupFinde == MY_NAME ? 'BACKUP' : null);
+
+  if (!rolSemana && !rolFinde) return null;
+
+  const partes = [];
+  if (rolSemana) partes.push(`${rolSemana} entre semana`);
+  if (rolFinde) partes.push(`${rolFinde} el fin de semana`);
+  return `⚠️ ${periodo} estás de soporte ${partes.join(' y ')}`;
 }
 
 // forzar = true (comando /check manual) responde siempre, aunque no te toque soporte.
@@ -129,16 +139,12 @@ async function leerSheetYNotificar(destinoChatId, forzar = false) {
       // Formatea los datos para el mensaje
       let mensaje = '🔔 **Soporte 24x7** 🔔\n\n';
 
-        // Alertas: una línea por cada turno en el que te toca soporte.
+        // Alertas: una sola línea por periodo, combinando semana y fin de semana.
         const alertas = [];
-        if (soportePrincipalSemana == MY_NAME) alertas.push(formatText('PRINCIPAL', 'ESTA SEMANA'));
-        if (soporteBackupSemana == MY_NAME) alertas.push(formatText('BACKUP', 'ESTA SEMANA'));
-        if (soportePrincipalWeekEnd == MY_NAME) alertas.push(formatText('PRINCIPAL', 'ESTE FIN DE SEMANA'));
-        if (soporteBackupWeekEnd == MY_NAME) alertas.push(formatText('BACKUP', 'ESTE FIN DE SEMANA'));
-        if (soportePrincipalSemanaNextWeek == MY_NAME) alertas.push(formatText('PRINCIPAL', 'LA SIGUIENTE SEMANA'));
-        if (soporteBackupSemanaNextWeek == MY_NAME) alertas.push(formatText('BACKUP', 'LA SIGUIENTE SEMANA'));
-        if (soportePrincipalWeekEndNextWeek == MY_NAME) alertas.push(formatText('PRINCIPAL', 'EL SIGUIENTE FIN DE SEMANA'));
-        if (soporteBackupWeekEndNextWeek == MY_NAME) alertas.push(formatText('BACKUP', 'EL SIGUIENTE FIN DE SEMANA'));
+        const alertaEstaSemana = construirAlerta('Esta semana', soportePrincipalSemana, soporteBackupSemana, soportePrincipalWeekEnd, soporteBackupWeekEnd);
+        const alertaProximaSemana = construirAlerta('La próxima semana', soportePrincipalSemanaNextWeek, soporteBackupSemanaNextWeek, soportePrincipalWeekEndNextWeek, soporteBackupWeekEndNextWeek);
+        if (alertaEstaSemana) alertas.push(alertaEstaSemana);
+        if (alertaProximaSemana) alertas.push(alertaProximaSemana);
 
         // Si no te toca soporte y es el aviso automático, no enviamos nada.
         if (!alertas.length && !forzar) {
