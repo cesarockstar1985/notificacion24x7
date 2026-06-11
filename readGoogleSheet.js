@@ -21,6 +21,12 @@ const MY_NAME = 'César Peralta';
 // Inicializa el bot de Telegram
 const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
 
+// Registra los comandos para que aparezcan en el botón de menú de Telegram
+bot.setMyCommands([
+  { command: 'start', description: 'Iniciar el bot y ver el mensaje de bienvenida' },
+  { command: 'check', description: 'Revisar el Google Sheet ahora' },
+]);
+
 bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
   const nombreUsuario = msg.from.first_name;
@@ -29,8 +35,14 @@ bot.onText(/\/start/, (msg) => {
 
   bot.sendMessage(chatId, mensajeBienvenida);
   console.log(`El usuario ${nombreUsuario} (ID: ${chatId}) ha iniciado el bot.`);
+});
 
-  leerSheetYNotificar()
+// Comando para forzar una revisión manual del Sheet
+bot.onText(/\/check/, (msg) => {
+  const chatId = msg.chat.id;
+  console.log(`Revisión manual solicitada por chat ${chatId}.`);
+  bot.sendMessage(chatId, '🔎 Revisando el Google Sheet...');
+  leerSheetYNotificar();
 });
 
 async function formatText(mainText, weekText) {
