@@ -47,14 +47,16 @@ bot.onText(/\/check/, (msg) => {
   ultimoChatId = chatId;
   console.log(`Revisión manual solicitada por chat ${chatId}.`);
   bot.sendMessage(chatId, '🔎 Revisando el Google Sheet...');
-  leerSheetYNotificar(chatId);
+  leerSheetYNotificar(chatId, true);
 });
 
-async function formatText(mainText, weekText) {
-  return `ESTÁS DE SOPORTE ${mainText} ${weekText} `;
+function formatText(mainText, weekText) {
+  return `⚠️ Estás de soporte ${mainText} ${weekText}`;
 }
 
-async function leerSheetYNotificar(destinoChatId) {
+// forzar = true (comando /check manual) responde siempre, aunque no te toque soporte.
+// forzar = false (cron automático) solo notifica cuando te toca soporte.
+async function leerSheetYNotificar(destinoChatId, forzar = false) {
   console.log('Iniciando proceso...');
   if (!destinoChatId) {
     console.log('No hay un chat destino; nadie ha iniciado el bot todavía. Omitiendo notificación.');
@@ -75,40 +77,58 @@ async function leerSheetYNotificar(destinoChatId) {
     });
     
     const rows = response.data.values;
+
+    // La API recorta las filas vacías del final, así que validamos antes de usarlas.
+    if (!rows || !rows.length) {
+      console.log('No se encontraron datos en el Sheet.');
+      return;
+    }
     console.log('Datos leídos correctamente.');
-    const soportePrincipalSemana = rows[0][0];
-    const soporteBackupSemana = rows[0][2];
 
-    const soportePrincipalWeekEnd = rows[3][0];
-    const soporteBackupWeekEnd = rows[3][2];
+    // Acceso seguro: si la fila no existe (rango recortado) devuelve cadena vacía.
+    const celda = (fila, col) => (rows[fila] && rows[fila][col]) || '';
 
-    const soportePrincipalSemanaNextWeek = rows[8][0];
-    const soporteBackupSemanaNextWeek = rows[8][2];
+    const soportePrincipalSemana = celda(0, 0);
+    const soporteBackupSemana = celda(0, 2);
 
-    const soportePrincipalWeekEndNextWeek = rows[11][0];
-    const soporteBackupWeekEndNextWeek = rows[11][2];
+    const soportePrincipalWeekEnd = celda(3, 0);
+    const soporteBackupWeekEnd = celda(3, 2);
+
+    const soportePrincipalSemanaNextWeek = celda(8, 0);
+    const soporteBackupSemanaNextWeek = celda(8, 2);
+
+    const soportePrincipalWeekEndNextWeek = celda(11, 0);
+    const soporteBackupWeekEndNextWeek = celda(11, 2);
 
     // 2. PROCESAMIENTO DE DATOS Y ENVÍO POR TELEGRAM
-    if (rows && rows.length) {
+    {
       // Formatea los datos para el mensaje
       let mensaje = '🔔 **Soporte 24x7** 🔔\n\n';
 
-        if(soportePrincipalSemana == MY_NAME){
-            mensaje += formatText('PRINCIPAL', 'ESTA SEMANA');
+        // Alertas: una línea por cada turno en el que te toca soporte.
+        const alertas = [];
+        if (soportePrincipalSemana == MY_NAME) alertas.push(formatText('PRINCIPAL', 'ESTA SEMANA'));
+        if (soporteBackupSemana == MY_NAME) alertas.push(formatText('BACKUP', 'ESTA SEMANA'));
+        if (soportePrincipalWeekEnd == MY_NAME) alertas.push(formatText('PRINCIPAL', 'ESTE FIN DE SEMANA'));
+        if (soporteBackupWeekEnd == MY_NAME) alertas.push(formatText('BACKUP', 'ESTE FIN DE SEMANA'));
+        if (soportePrincipalSemanaNextWeek == MY_NAME) alertas.push(formatText('PRINCIPAL', 'LA SIGUIENTE SEMANA'));
+        if (soporteBackupSemanaNextWeek == MY_NAME) alertas.push(formatText('BACKUP', 'LA SIGUIENTE SEMANA'));
+        if (soportePrincipalWeekEndNextWeek == MY_NAME) alertas.push(formatText('PRINCIPAL', 'EL SIGUIENTE FIN DE SEMANA'));
+        if (soporteBackupWeekEndNextWeek == MY_NAME) alertas.push(formatText('BACKUP', 'EL SIGUIENTE FIN DE SEMANA'));
+
+        // Si no te toca soporte y es el aviso automático, no enviamos nada.
+        if (!alertas.length && !forzar) {
+            console.log('No te toca soporte. Aviso automático omitido.');
+            return;
         }
 
-        if(soporteBackupSemana == MY_NAME){
-            mensaje += formatText('BACKUP', 'ESTA SEMANA');
+        if (alertas.length) {
+            mensaje += alertas.join('\n') + '\n\n';
+        } else {
+            mensaje += '✅ No te toca soporte por ahora.\n\n';
         }
 
-        if((soportePrincipalSemana == MY_NAME && soportePrincipalWeekEnd == MY_NAME) || (soporteBackupSemana == MY_NAME && soporteBackupWeekEnd == MY_NAME)){
-            mensaje += 'Y '
-        }
-
-        if(soportePrincipalWeekEnd == MY_NAME || soporteBackupWeekEnd == MY_NAME){
-            mensaje += 'ESTE FIN DE SEMANA!!\n\n';
-        }
-
+        mensaje += 'Soporte Semana\n\n'
         mensaje += `Principal: ${soportePrincipalSemana}\n`
         mensaje += `Backup: ${soporteBackupSemana}`
 
@@ -117,31 +137,11 @@ async function leerSheetYNotificar(destinoChatId) {
         mensaje += `Principal: ${soportePrincipalWeekEnd}\n`
         mensaje += `Backup: ${soporteBackupWeekEnd}\n\n`
 
-        if(soportePrincipalSemanaNextWeek == MY_NAME){
-            mensaje += formatText('PRINCIPAL', 'LA SIGUIENTE SEMANA');
-        }
-
-        if(soporteBackupSemanaNextWeek == MY_NAME){
-            mensaje += formatText('BACKUP', 'LA SIGUIENTE SEMANA');
-        }
-
-        if((soportePrincipalSemanaNextWeek == MY_NAME && soportePrincipalWeekEndNextWeek == MY_NAME) || (soporteBackupSemanaNextWeek == MY_NAME && soporteBackupWeekEndNextWeek == MY_NAME)){
-            mensaje += 'Y '
-        }
-
-        if(soportePrincipalWeekEndNextWeek == MY_NAME || soporteBackupWeekEndNextWeek == MY_NAME){
-            mensaje += 'EL SIGUIENTE FIN DE SEMANA!!\n\n';
-        }
-
       console.log('Enviando notificación a Telegram...');
       // Envía el mensaje usando el bot
       await bot.sendMessage(destinoChatId, mensaje, { parse_mode: 'Markdown' });
-      
+
       console.log('¡Notificación enviada con éxito! ✅');
-    } else {
-      console.log('No se encontraron datos en el Sheet.');
-      // Opcional: enviar una notificación de que no se encontraron datos
-      // await bot.sendMessage(CHAT_ID, 'No se encontraron datos nuevos en la revisión de hoy.');
     }
   } catch (error) {
     console.error('Hubo un error en el proceso:', error.message);
@@ -154,7 +154,7 @@ async function leerSheetYNotificar(destinoChatId) {
   }
 }
 
-// 2. PROGRAMA LA TAREA PARA QUE SE EJECUTE TODOS LOS DÍAS A LAS 9:00 AM
+// 2. PROGRAMA LA TAREA PARA QUE SE EJECUTE TODOS LOS DÍAS A LAS 7:00 AM
 cron.schedule('0 7 * * *', () => {
   leerSheetYNotificar(ultimoChatId);
 }, {
